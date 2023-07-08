@@ -1,12 +1,17 @@
 import sys
 import os
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QMenu, QSystemTrayIcon, QFileDialog, QTabWidget, QCheckBox, QPushButton
+import json
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QMenu, QSystemTrayIcon, QFileDialog, QTabWidget, QCheckBox, QPushButton, QLineEdit
 from PyQt6.QtGui import QIcon, QCloseEvent, QAction
 from PyQt6.QtCore import QSize, QSettings
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        # Read configuration from file
+        self.config = self.read_from_config()
+
         self.setWindowTitle('AutoCopier')
         self.resize(QSize(500,400))
         self.tab = QTabWidget()
@@ -26,11 +31,20 @@ class MainWindow(QMainWindow):
         self.source_button.clicked.connect(self.select_source)
         preferences_layout.addWidget(self.source_button)
 
+        # Source directory input box
+        self.source_input = QLineEdit(self.config.get('source_directory', ''))
+        preferences_layout.addWidget(self.source_input)
+
         self.destination_button = QPushButton('Select Destination')
         self.destination_button.clicked.connect(self.select_destination)
         preferences_layout.addWidget(self.destination_button)
 
+        # Destination directory input box
+        self.destination_input = QLineEdit(self.config.get('destination_directory', ''))
+        preferences_layout.addWidget(self.destination_input)
+
         self.autocopy_button = QCheckBox('Autocopy')
+        self.autocopy_button.setChecked(self.config.get('autocopy', False))
         self.autocopy_button.stateChanged.connect(self.change_state_of_autocopy)
         preferences_layout.addWidget(self.autocopy_button)
 
@@ -48,22 +62,39 @@ class MainWindow(QMainWindow):
     def select_source(self):
         source = QFileDialog.getExistingDirectory(self, 'Select Source Directory')
         print(f'Selected Source Directory: {source}')
-        # Save to settings
-        QSettings().setValue('source_directory', source)
+        self.source_input.setText(source)
+        self.save_to_config('source_directory', source)
 
     def select_destination(self):
         destination = QFileDialog.getExistingDirectory(self, 'Select Destination Directory')
         print(f'Selected Destination Directory: {destination}')
-        # Save to settings
-        QSettings().setValue('destination_directory', destination)
+        self.destination_input.setText(destination)
+        self.save_to_config('destination_directory', destination)
 
     def change_state_of_autocopy(self, state):
         if state == 0:
             print('Autocopy Deactivated')
-            QSettings().setValue('autocopy', False)
+            self.save_to_config('autocopy', False)
         else:
             print('Autocopy Activated')
-            QSettings().setValue('autocopy', True)
+            self.save_to_config('autocopy', True)
+
+    def save_to_config(self, key, value):
+        config = {}
+        if os.path.exists('config.json'):
+            with open('config.json', 'r') as f:
+                config = json.load(f)
+
+        config[key] = value
+
+        with open('config.json', 'w') as f:
+            json.dump(config, f)
+
+    def read_from_config(self):
+        if os.path.exists('config.json'):
+            with open('config.json', 'r') as f:
+                return json.load(f)
+        return {}
 
 class SystemTrayIcon(QSystemTrayIcon):
     def __init__(self, icon, parent=None):
