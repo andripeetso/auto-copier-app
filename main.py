@@ -1,9 +1,12 @@
 import sys
 import os
 import json
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QMenu, QSystemTrayIcon, QFileDialog, QTabWidget, QCheckBox, QPushButton, QLineEdit
-from PyQt6.QtGui import QIcon, QCloseEvent, QAction
-from PyQt6.QtCore import QSize, QSettings
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QMenu, QSystemTrayIcon, QFileDialog, QTabWidget
+from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtCore import QSize
+from home import HomeTab
+from preferences import PreferencesTab
+from shutil import copy2
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -17,38 +20,14 @@ class MainWindow(QMainWindow):
         self.tab = QTabWidget()
 
         # Home Tab
-        home_tab = QWidget()
-        home_layout = QVBoxLayout(home_tab)
-        label = QLabel('Welcome to AutoCopier')
-        home_layout.addWidget(label)
-        self.tab.addTab(home_tab, 'Home')
+        self.home_tab = HomeTab(self)
+        self.tab.addTab(self.home_tab, 'Home')
+        self.home_tab.update_file_list("Today")  # Call update_file_list with "Today"
 
         # Preferences Tab
-        preferences_tab = QWidget()
-        preferences_layout = QVBoxLayout(preferences_tab)
+        self.preferences_tab = PreferencesTab(self)
+        self.tab.addTab(self.preferences_tab, 'Preferences')
 
-        self.source_button = QPushButton('Select Source')
-        self.source_button.clicked.connect(self.select_source)
-        preferences_layout.addWidget(self.source_button)
-
-        # Source directory input box
-        self.source_input = QLineEdit(self.config.get('source_directory', ''))
-        preferences_layout.addWidget(self.source_input)
-
-        self.destination_button = QPushButton('Select Destination')
-        self.destination_button.clicked.connect(self.select_destination)
-        preferences_layout.addWidget(self.destination_button)
-
-        # Destination directory input box
-        self.destination_input = QLineEdit(self.config.get('destination_directory', ''))
-        preferences_layout.addWidget(self.destination_input)
-
-        self.autocopy_button = QCheckBox('Autocopy')
-        self.autocopy_button.setChecked(self.config.get('autocopy', False))
-        self.autocopy_button.stateChanged.connect(self.change_state_of_autocopy)
-        preferences_layout.addWidget(self.autocopy_button)
-
-        self.tab.addTab(preferences_tab, 'Preferences')
         self.setCentralWidget(self.tab)
 
         # Menu bar
@@ -56,28 +35,12 @@ class MainWindow(QMainWindow):
         preferences = QAction("Preferences", triggered=self.open_preferences)
         menu.addAction(preferences)
 
+    def update_config(self):
+        self.config = self.read_from_config()
+        self.home_tab.update_file_list()  # use current category
+
     def open_preferences(self):
         self.tab.setCurrentIndex(1)
-
-    def select_source(self):
-        source = QFileDialog.getExistingDirectory(self, 'Select Source Directory')
-        print(f'Selected Source Directory: {source}')
-        self.source_input.setText(source)
-        self.save_to_config('source_directory', source)
-
-    def select_destination(self):
-        destination = QFileDialog.getExistingDirectory(self, 'Select Destination Directory')
-        print(f'Selected Destination Directory: {destination}')
-        self.destination_input.setText(destination)
-        self.save_to_config('destination_directory', destination)
-
-    def change_state_of_autocopy(self, state):
-        if state == 0:
-            print('Autocopy Deactivated')
-            self.save_to_config('autocopy', False)
-        else:
-            print('Autocopy Activated')
-            self.save_to_config('autocopy', True)
 
     def save_to_config(self, key, value):
         config = {}
@@ -95,6 +58,9 @@ class MainWindow(QMainWindow):
             with open('config.json', 'r') as f:
                 return json.load(f)
         return {}
+    
+    def offload_drive(self):
+        self.home_tab.offload_drive()
 
 class SystemTrayIcon(QSystemTrayIcon):
     def __init__(self, icon, parent=None):
@@ -102,6 +68,10 @@ class SystemTrayIcon(QSystemTrayIcon):
         self.parent = parent
         self.setToolTip('AutoCopier')
         menu = QMenu(parent)
+
+        offload_drive_action = QAction("Offload Drive")
+        offload_drive_action.triggered.connect(self.parent.offload_drive)
+        menu.addAction(offload_drive_action)
 
         open_preferences = QAction("Preferences...")
         open_preferences.triggered.connect(self.on_open_preferences)
@@ -127,7 +97,12 @@ def main():
     main_window = MainWindow()
 
     # Set the menu bar	
-    menu = main_window.menuBar().addMenu('File')	
+    menu = main_window.menuBar().addMenu('File')
+
+    # Add offload drive option
+    offload_drive = QAction("Offload Drive", triggered=main_window.offload_drive)
+    menu.addAction(offload_drive)
+
     # Add preference option	
     preferences = QAction("Preferences", triggered=main_window.open_preferences)	
     menu.addAction(preferences)
