@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QVBoxLayout, QWidget, QPushButton, QLineEdit, QCheckBox
+from PyQt6.QtWidgets import QVBoxLayout, QWidget, QPushButton, QLineEdit, QCheckBox, QComboBox
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtCore import QCoreApplication
 
@@ -30,6 +30,13 @@ class PreferencesTab(QWidget):
         self.autocopy_button.stateChanged.connect(self.change_state_of_autocopy)
         self.preferences_layout.addWidget(self.autocopy_button)
 
+        self.timeframe_combobox = QComboBox()
+        self.timeframe_combobox.addItem('Today')
+        self.timeframe_combobox.addItem('All files')
+        self.timeframe_combobox.setCurrentText(self.parent.config.get('timeframe', 'Today'))
+        self.timeframe_combobox.currentTextChanged.connect(self.change_timeframe)
+        self.preferences_layout.addWidget(self.timeframe_combobox)
+
         # Set the layout on the widget
         self.setLayout(self.preferences_layout)
 
@@ -54,3 +61,7 @@ class PreferencesTab(QWidget):
         else:
             print('Autocopy Activated')
             self.parent.save_to_config('autocopy', True)
+
+    def change_timeframe(self, text):
+        print(f'Selected Timeframe: {text}')
+        self.parent.save_to_config('timeframe', text)
